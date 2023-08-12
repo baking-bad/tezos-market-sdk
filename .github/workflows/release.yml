@@ -1,0 +1,62 @@
+name: Release
+on:
+  push:
+    tags:
+      - "*.*.*"
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Unity project structure
+        uses: actions/checkout@v2
+        with:
+          repository: baking-bad/unity-project-structure
+
+      - name: Check out the repo
+        uses: actions/checkout@v3
+        with:
+          path: Assets/TezosMarketSdk
+
+      - name: Archive Release
+        uses: thedoctor0/zip-release@0.7.1
+        with:
+          type: "zip"
+          directory: ./Assets/TezosMarketSdk/
+          filename: "tezos-market-sdk.zip"
+          exclusions: "*.git* *.github*"
+
+      - name: Create unitypackageFiles
+        run: |
+          echo "Assets/TezosMarketSdk.meta" > unitypackageFiles
+          mv Assets/TezosMarketSdk/Samples~ Assets/TezosMarketSdk/Samples
+          find ./Assets/TezosMarketSdk/ -name \*.meta ! -path "./Assets/TezosUnitySdk/*.md.meta" >> unitypackageFiles
+
+      - name: Create unitypackage
+        uses: pCYSl5EDgo/create-unitypackage@master
+        with:
+          package-path: 'TezosMarketSdk.unitypackage'
+          include-files: unitypackageFiles
+
+      - name: Parse changelog
+        id: changelog
+        uses: mindsers/changelog-reader-action@v2
+        with:
+          path: ./Assets/TezosMarketSdk/CHANGELOG.md
+          version: ${{ github.ref_name }}
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: ${{ steps.changelog.outputs.version }}
+          tag_name: ${{ github.ref_name }}
+          body: |
+            ## ${{ steps.changelog.outputs.date }}
+            ${{ steps.changelog.outputs.changes }}
+          prerelease: ${{ steps.changelog.outputs.status == 'prereleased' }}
+          files: |
+            ./Assets/TezosMarketSdk/tezos-market-sdk.zip
+            TezosMarketSdk.unitypackage
